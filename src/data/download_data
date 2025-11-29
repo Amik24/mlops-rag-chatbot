@@ -1,0 +1,20 @@
+import os
+from pathlib import Path
+
+RAW_DIR = Path("data/raw")
+
+
+def main():
+    """
+    Prepare the folder for raw course files (pdf, ppt, etc).
+
+    For now, this just creates the folder.
+    Later you can add logic to copy or download files.
+    """
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"Raw data folder ready at: {RAW_DIR.resolve()}")
+    print("Place your course pdf or ppt files in this folder.")
+
+
+if __name__ == "__main__":
+    main()
