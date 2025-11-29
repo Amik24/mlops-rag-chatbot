@@ -1,0 +1,17 @@
+from download_data import main as download_main
+from clean_transform import main as clean_main
+from build_embeddings import main as embeddings_main
+
+
+def main():
+    print("Running data pipeline...")
+
+    download_main()
+    clean_main()
+    embeddings_main()
+
+    print("Data pipeline completed.")
+
+
+if __name__ == "__main__":
+    main()
