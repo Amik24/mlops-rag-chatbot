@@ -1,0 +1,38 @@
+from pathlib import Path
+
+import pandas as pd
+
+PROCESSED_DIR = Path("data/processed")
+EMB_DIR = Path("data/embeddings")
+CORPUS_PATH = PROCESSED_DIR / "corpus.parquet"
+EMB_PATH = EMB_DIR / "embeddings.parquet"
+
+
+def main():
+    """
+    Load the cleaned corpus and create embeddings.
+
+    For now, this adds an empty "embedding" column.
+    Later we will:
+      - load a sentence transformer or other model
+      - encode text into vectors
+      - save the vectors to disk
+    """
+    EMB_DIR.mkdir(parents=True, exist_ok=True)
+
+    if not CORPUS_PATH.exists():
+        raise FileNotFoundError(
+            f"{CORPUS_PATH} not found. Run clean_transform first."
+        )
+
+    df = pd.read_parquet(CORPUS_PATH)
+
+    # Placeholder: one empty embedding list per row
+    df["embedding"] = [[] for _ in range(len(df))]
+
+    df.to_parquet(EMB_PATH)
+    print(f"Embeddings saved to: {EMB_PATH.resolve()}")
+
+
+if __name__ == "__main__":
+    main()
