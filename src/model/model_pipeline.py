@@ -4,11 +4,13 @@ import boto3
 from pathlib import Path
 from dotenv import load_dotenv 
 
-# Imports des dépendances RAG
+# Imports des dépendances RAG - NOUVELLES IMPORTATIONS
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain.chains import RetrievalQA
+from langchain.chains.retrieval import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.prompts import ChatPromptTemplate
 
 # --- Configuration des chemins et ressources ---
 S3_BUCKET_NAME = "g1-data"
@@ -70,23 +72,43 @@ class RAGModel:
             api_key=os.environ.get("GROQ_API_KEY") # Lit la clé Groq définie par Streamlit Secrets
         )   
 
-        # 5. Create Retrieval Chain
-        self.qa_chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
-            retriever=self.vector_store.as_retriever(search_kwargs={"k": 4}),
-            return_source_documents=True
-        )
+        # 5. Create Retrieval Chain - NOUVELLE MÉTHODE
+        # Création du prompt template
+        prompt = ChatPromptTemplate.from_template("""
+        Réponds à la question en te basant sur le contexte suivant.
+        Si tu ne connais pas la réponse, dis simplement que tu ne sais pas.
+        
+        Contexte: {context}
+        
+        Question: {input}
+        
+        Réponse détaillée:""")
+        
+        # Créer la chaîne de documents
+        document_chain = create_stuff_documents_chain(llm, prompt)
+        
+        # Créer la chaîne de retrieval complète
+        retriever = self.vector_store.as_retriever(search_kwargs={"k": 4})
+        self.qa_chain = create_retrieval_chain(retriever, document_chain)
+        
         print("✅ RAG Model Loaded Successfully.")
 
     def predict(self, query):
+        """
+        Prédit la réponse à une requête en utilisant la chaîne RAG.
+        Retourne la réponse et les sources uniques.
+        """
         if not self.qa_chain:
             raise Exception("RAG chain not initialized.")
         
-        response = self.qa_chain.invoke({"query": query})
+        # NOUVELLE SYNTAXE: utilise "input" au lieu de "query"
+        response = self.qa_chain.invoke({"input": query})
         
-        answer = response['result']
-        sources = [doc.metadata.get('source_file', 'Unknown') for doc in response['source_documents']]
+        # NOUVELLE SYNTAXE: la réponse est dans "answer" au lieu de "result"
+        answer = response['answer']
+        
+        # Les documents sources sont dans "context"
+        sources = [doc.metadata.get('source_file', 'Unknown') for doc in response['context']]
         unique_sources = list(set(sources))
         
         return answer, unique_sources
