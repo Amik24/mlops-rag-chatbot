@@ -1,80 +1,72 @@
 import os
-import sys
 import boto3
-from pathlib import Path
-from dotenv import load_dotenv # Maintenu pour le test local
-
-# --- Imports LCEL/Moderne ---
+import shutil
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains.retrieval import create_retrieval_chain
 from langchain_core.prompts import ChatPromptTemplate
-# --- Fin Imports LCEL/Moderne ---
+from dotenv import load_dotenv
 
-# Ajoutez le chemin 'src' pour les imports (si nécessaire)
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+load_dotenv()
 
-# --- Configuration des chemins S3/Locaux ---
+# Configuration S3
 S3_BUCKET_NAME = "g1-data"
-S3_INDEX_PREFIX = "artifacts/vector_index/" 
-INDEX_PATH = "data/processed/faiss_index" 
-# La variable INDEX_PATH doit être utilisée pour le chemin local
+# Chemin exact où le workflow GitHub a uploadé le dossier (recursive)
+S3_ARTIFACT_PATH = "artifacts/vector_index/faiss_index"
+
+# Chemin local temporaire pour Streamlit
+LOCAL_INDEX_PATH = "/tmp/faiss_index_g1"
 
 class RAGModel:
     def __init__(self):
         self.vector_store = None
         self.qa_chain = None
-        # Mettre à jour la variable pour qu'elle soit en snake_case
-        self.INDEX_PATH = INDEX_PATH 
 
-    def download_index_from_s3(self):
-        """Télécharge les fichiers index.faiss et index.pkl depuis S3."""
-        Path(self.INDEX_PATH).mkdir(parents=True, exist_ok=True)
+    def _download_index_from_s3(self):
+        """Télécharge l'index FAISS (dossier) depuis S3."""
+        print(f"🔄 Tentative de téléchargement de l'index depuis S3 ({S3_BUCKET_NAME})...")
         
-        # Initialiser Boto3 (Il lit les clés SSO/Région depuis os.environ)
+        if os.path.exists(LOCAL_INDEX_PATH):
+            shutil.rmtree(LOCAL_INDEX_PATH)
+        os.makedirs(LOCAL_INDEX_PATH)
+
         try:
-            s3 = boto3.client('s3', region_name=os.environ.get("AWS_REGION"))
+            s3 = boto3.client('s3')
+            # FAISS nécessite index.faiss et index.pkl
+            files_to_download = ["index.faiss", "index.pkl"]
+            
+            for file in files_to_download:
+                s3_key = f"{S3_ARTIFACT_PATH}/{file}"
+                local_dest = f"{LOCAL_INDEX_PATH}/{file}"
+                print(f"⬇️ Downloading {file}...")
+                s3.download_file(S3_BUCKET_NAME, s3_key, local_dest)
+            
+            print("✅ Index FAISS téléchargé avec succès.")
+            return True
         except Exception as e:
-            raise Exception(f"Erreur d'initialisation Boto3 (Clés/Région) : {e}")
+            print(f"❌ Erreur téléchargement S3: {e}")
+            raise e
 
-        required_files = ["index.faiss", "index.pkl"]
-        print(f"Téléchargement de l'index depuis s3://{S3_BUCKET_NAME}/{S3_INDEX_PREFIX}")
-
-        for filename in required_files:
-            s3_key = S3_INDEX_PREFIX + filename
-            local_path = Path(self.INDEX_PATH) / filename
-            try:
-                s3.download_file(S3_BUCKET_NAME, s3_key, str(local_path))
-                print(f"-> Téléchargé : {filename}")
-            except Exception as e:
-                raise FileNotFoundError(f"Fichier S3 manquant : {s3_key}. Détail: {e}")
-        
     def load_model(self):
-        """
-        Gère le téléchargement de l'index S3, le chargement local et la configuration de la chaîne RAG.
-        """
-        # --- 1. Télécharger l'index avant de le charger ---
-        if not (Path(self.INDEX_PATH) / "index.faiss").exists():
-            print("Index local non trouvé. Téléchargement depuis S3...")
-            self.download_index_from_s3()
-        else:
-            print("Index trouvé localement.")
+        # 1. Télécharger l'index frais depuis S3
+        self._download_index_from_s3()
 
-        # 2. Charger les Embeddings et le Vector Store
+        print("🧠 Chargement des Embeddings et du Vector Store...")
         embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
+        # 2. Charger l'index localement
         self.vector_store = FAISS.load_local(
-            self.INDEX_PATH, 
+            LOCAL_INDEX_PATH, 
             embeddings, 
             allow_dangerous_deserialization=True
         )
 
-        # 3. Initialize LLM (Groq)
+        # 3. Initialiser LLM (Groq)
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
-            raise ValueError("GROQ_API_KEY manquante dans l'environnement Streamlit/CI/CD.")
+            raise ValueError("❌ GROQ_API_KEY manquante dans les variables d'environnement")
 
         llm = ChatGroq(
             temperature=0.3, 
@@ -82,53 +74,37 @@ class RAGModel:
             api_key=api_key
         )
 
-        # 4. Create Prompt Template
+        # 4. Créer le Prompt
         prompt = ChatPromptTemplate.from_template("""
-        You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. 
-        If you don't know the answer, just say that you don't know. Keep the answer concise.
+        You are an assistant for question-answering tasks based on course materials.
+        Use the following pieces of retrieved context to answer the question. 
+        If you don't know the answer, just say that you don't know. 
+        Keep the answer concise.
 
         <context>
         {context}
         </context>
 
         Question: {input}
+        Answer:
         """)
 
-        # 5. Create the Document Chain
+        # 5. Créer la Chaîne RAG
         question_answer_chain = create_stuff_documents_chain(llm, prompt)
-
-        # 6. Create the Retrieval Chain
         retriever = self.vector_store.as_retriever(search_kwargs={"k": 4})
         self.qa_chain = create_retrieval_chain(retriever, question_answer_chain)
         
-        print("✅ Modèle RAG chargé avec succès (LCEL).")
+        print("✅ Modèle RAG opérationnel.")
 
     def predict(self, query):
         if not self.qa_chain:
-            raise Exception("RAG chain not initialized.")
-            
-        # LCEL utilise "input" comme clé d'entrée
+            self.load_model()
+        
         response = self.qa_chain.invoke({"input": query})
-        
-        # LCEL utilise "answer" comme clé de sortie pour la réponse
-        answer = response.get('answer', 'Error: Answer not found.')
-        
-        # LCEL utilise "context" pour les documents sources
-        sources = [doc.metadata.get('source_file', 'Inconnu') for doc in response.get('context', [])]
-        unique_sources = list(set(sources))
-        
-        return answer, unique_sources
+        return response['answer'], [doc.metadata.get('source_file', 'Doc') for doc in response['context']]
 
-# Test run
 if __name__ == "__main__":
-    load_dotenv()
-    if not os.path.exists(INDEX_PATH):
-        print("NOTE: Index non trouvé. Lancer le pipeline de vectorisation d'abord.")
-        sys.exit(1)
-        
+    # Test local rapide
     rag = RAGModel()
     rag.load_model()
-    print("--- Test Question ---")
-    ans, src = rag.predict("What is the Vanishing Gradient Problem?")
-    print(f"🤖 Réponse : {ans}")
-    print(f"📚 Sources : {src}")
+    print(rag.predict("What is NLP?"))
