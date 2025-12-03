@@ -16,7 +16,7 @@ env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   S3_BUCKET_NAME: "g1-data"
   # Chemin de destination pour l'artefact index vectoriel
-  S3_ARTIFACT_KEY: "artifacts/vector_index/faiss_index.bin" 
+  S3_ARTIFACT_KEY: "artifacts/vector_index/faiss_index" 
   PYTHON_VERSION: "3.10"
   
 jobs:
