@@ -1,38 +1,33 @@
-from pathlib import Path
+import os
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+from src.data.clean_transform import process_documents # Utilise le chemin relatif corrigé
 
-import pandas as pd
+# ATTENTION : La sauvegarde FAISS génère un dossier, non un seul fichier.
+# Le chemin que vous utilisez dans CI/CD sera 'data/processed/faiss_index'
+PROCESSED_DATA_PATH = "data/processed/faiss_index" 
 
-PROCESSED_DIR = Path("data/processed")
-EMB_DIR = Path("data/embeddings")
-CORPUS_PATH = PROCESSED_DIR / "corpus.parquet"
-EMB_PATH = EMB_DIR / "embeddings.parquet"
+def build_vector_store():
+    # 1. Get Chunks
+    chunks = process_documents()
+    if not chunks:
+        print("❌ Pas de données à intégrer.")
+        return
 
+    # 2. Initialize Embedding Model
+    print("⏳ Génération des Embeddings (cela peut prendre un instant)...")
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-def main():
-    """
-    Load the cleaned corpus and create embeddings.
+    # 3. Create Vector Store
+    vector_store = FAISS.from_documents(chunks, embeddings)
 
-    For now, this adds an empty "embedding" column.
-    Later we will:
-      - load a sentence transformer or other model
-      - encode text into vectors
-      - save the vectors to disk
-    """
-    EMB_DIR.mkdir(parents=True, exist_ok=True)
-
-    if not CORPUS_PATH.exists():
-        raise FileNotFoundError(
-            f"{CORPUS_PATH} not found. Run clean_transform first."
-        )
-
-    df = pd.read_parquet(CORPUS_PATH)
-
-    # Placeholder: one empty embedding list per row
-    df["embedding"] = [[] for _ in range(len(df))]
-
-    df.to_parquet(EMB_PATH)
-    print(f"Embeddings saved to: {EMB_PATH.resolve()}")
-
+    # 4. Save to Disk
+    if not os.path.exists(os.path.dirname(PROCESSED_DATA_PATH)):
+        os.makedirs(os.path.dirname(PROCESSED_DATA_PATH))
+    
+    # FAISS sauvegarde deux fichiers (index.faiss et index.pkl) dans ce dossier
+    vector_store.save_local(PROCESSED_DATA_PATH)
+    print(f"✅ Base de données vectorielle sauvegardée dans {PROCESSED_DATA_PATH}")
 
 if __name__ == "__main__":
-    main()
+    build_vector_store()
