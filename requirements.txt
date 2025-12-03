@@ -1,21 +1,30 @@
 # --- Frameworks & UI ---
-streamlit
-pandas
-python-dotenv  # Maintenu pour le test local
+streamlit>=1.28.0
+pandas>=2.0.0
+python-dotenv>=1.0.0  # Maintenu pour le test local
 
-# --- Core LangChain et Utilitaire ---
-langchain
-langchain-core 
-langchain-community  # Contient PyPDFLoader et FAISS
-pypdf  # Nécessaire pour les documents PDF
+# --- Core LangChain (Nouvelle API) ---
+langchain>=0.1.0
+langchain-core>=0.1.0
+langchain-community>=0.0.20
+
+# --- Lecture de Documents PDF ---
+pypdf>=3.17.0  # Nécessaire pour PyPDFLoader
 
 # --- Providers Spécifiques ---
-langchain-groq       # Pour l'intégration du LLM Groq (ChatGroq)
-# HuggingFaceEmbeddings est inclus dans langchain-community, 
-# mais nous ajoutons la dépendance transformers pour le modèle:
-transformers         
-sentence-transformers # Pour les embeddings (HuggingFaceEmbeddings utilise sentence-transformers)
-langchain-huggingface
+langchain-groq>=0.0.1       # Pour l'intégration du LLM Groq (ChatGroq)
+langchain-huggingface>=0.0.1  # Pour HuggingFaceEmbeddings
+
+# --- Embeddings et Transformers ---
+transformers>=4.30.0
+sentence-transformers>=2.2.0  # Requis pour les embeddings HuggingFace
+torch>=2.0.0  # Requis par sentence-transformers (version CPU)
 
 # --- Vector Store ---
-faiss-cpu
+faiss-cpu>=1.7.4
+
+# --- AWS pour S3 ---
+boto3>=1.28.0
+
+# --- Dépendances supplémentaires utiles ---
+numpy>=1.24.0
