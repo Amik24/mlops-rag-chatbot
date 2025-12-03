@@ -1,7 +1,31 @@
+# ----------------------------------------------------------------------
+# 1. DEPENDANCES CORE (PYTHON & ML)
+# ----------------------------------------------------------------------
 numpy
 pandas
-scikit-learn
-sentence-transformers
-pypdf
-python-dotenv
-streamlit
+scikit-learn         # Pour les utilitaires ML/clustering (si besoin dans clean_transform)
+
+# ----------------------------------------------------------------------
+# 2. APPLICATION & INTERFACE UTILISATEUR
+# ----------------------------------------------------------------------
+streamlit            # Framework pour l'interface web du Chatbot.
+
+# ----------------------------------------------------------------------
+# 3. PIPELINE RAG (Retrieval-Augmented Generation)
+# ----------------------------------------------------------------------
+langchain            # Framework pour orchestrer le pipeline RAG (Chaining, Prompting).
+langchain-community  # Modules pour les intégrations de LangChain (Vector Stores, Loaders, etc.).
+sentence-transformers# Bibliothèque pour générer les embeddings (vecteurs) des documents.
+pypdf                # Pour la lecture et l'extraction de texte à partir des fichiers PDF bruts.
+
+# ----------------------------------------------------------------------
+# 4. STOCKAGE VECTORIEL (Artifacts)
+# ----------------------------------------------------------------------
+faiss-cpu            # Moteur de recherche de similarité vectorielle (index local).
+# chromadb           # Alternative si vous utilisez un Vector Store léger au lieu de FAISS.
+
+# ----------------------------------------------------------------------
+# 5. AWS & CI/CD (Communication avec S3)
+# ----------------------------------------------------------------------
+boto3                # AWS SDK pour Python (pour le téléchargement/téléversement depuis S3).
+awscli               # AWS Command Line Interface (utilisé directement par le workflow GitHub Actions pour 'aws s3 cp').
