@@ -1,17 +1,25 @@
-from download_data import main as download_main
-from clean_transform import main as clean_main
-from build_embeddings import main as embeddings_main
+from src.data.download_data import download_pdfs
+from src.data.build_embeddings import build_vector_store
+import shutil
+from pathlib import Path
 
+def run_data_pipeline():
+    """Orchestre l'ensemble du pipeline de vectorisation."""
+    print("--- Démarrage du Pipeline de Vectorisation (CI/CD) ---")
+    
+    # 1. Téléchargement des données (depuis S3)
+    download_pdfs()
+    
+    # 2. Nettoyage, Transformation, Embedding et Sauvegarde
+    build_vector_store()
+    
+    # 3. Nettoyage : Supprimer le dossier temporaire des PDF
+    temp_dir = Path("data/raw")
+    if temp_dir.exists():
+        shutil.rmtree(temp_dir)
+        print("✅ Nettoyage des fichiers PDF temporaires réussi.")
 
-def main():
-    print("Running data pipeline...")
-
-    download_main()
-    clean_main()
-    embeddings_main()
-
-    print("Data pipeline completed.")
-
+    print("--- Pipeline de Vectorisation terminé avec succès ---")
 
 if __name__ == "__main__":
-    main()
+    run_data_pipeline()
