@@ -1,1 +1,41 @@
+name: Test de Connexion AWS S3 (Clés Temporaires)
 
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  S3_BUCKET_NAME: "groupe1-data"
+  PYTHON_VERSION: "3.13.9"  # <--- MISE À JOUR DE LA VERSION PYTHON
+
+jobs:
+  check_s3_access:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install AWS CLI
+        run: |
+          pip install awscli
+
+      # --- Configuration des identifiants AWS Temporaires (SSO) ---
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }} 
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Test Listing S3 Bucket
+        run: |
+          echo "Tentative de listage du bucket S3 : ${{ env.S3_BUCKET_NAME }}"
+          aws s3 ls s3://${{ env.S3_BUCKET_NAME }}
+          echo "Connexion AWS réussie et accès S3 confirmé."
