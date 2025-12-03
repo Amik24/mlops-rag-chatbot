@@ -3,8 +3,6 @@ import sys
 import os
 
 # --- 1. LE PONT DES SECRETS (CRUCIAL POUR STREAMLIT CLOUD) ---
-# Streamlit Cloud stocke les secrets dans `st.secrets`, mais boto3 et LangChain
-# cherchent dans `os.environ`. On fait donc le transfert ici.
 if "AWS_ACCESS_KEY_ID" in st.secrets:
     os.environ["AWS_ACCESS_KEY_ID"] = st.secrets["AWS_ACCESS_KEY_ID"]
     os.environ["AWS_SECRET_ACCESS_KEY"] = st.secrets["AWS_SECRET_ACCESS_KEY"]
@@ -14,19 +12,30 @@ if "AWS_ACCESS_KEY_ID" in st.secrets:
 if "GROQ_API_KEY" in st.secrets:
     os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
-# --- 2. CONFIGURATION DES CHEMINS ---
-# Le fichier est dans 'app/', donc on remonte d'UN niveau ('..') pour trouver 'src/'
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+# --- 2. CONFIGURATION DES CHEMINS (CORRIGÉ) ---
+# On récupère le dossier courant (app/)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# On remonte d'un niveau pour atteindre la racine du projet (mlops-rag-chatbot/)
+project_root = os.path.abspath(os.path.join(current_dir, '..'))
 
-# On importe le modèle SEULEMENT après avoir injecté les secrets
+# C'EST LA LIGNE QUI MANQUAIT :
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+# Debug (Optionnel : pour voir dans les logs Streamlit si le chemin est bon)
+print(f"📂 Racine ajoutée au path : {project_root}")
+
+# Importation du modèle
 try:
     from src.model.model_pipeline import RAGModel
-except ImportError:
-    # Fallback pour le développement local si lancé depuis la racine
-    from src.model.model_pipeline import RAGModel
+except ImportError as e:
+    st.error(f"❌ Erreur d'importation : {e}")
+    st.write(f"Chemins actuels : {sys.path}") # Aidera au débogage si ça plante encore
+    st.stop()
 
 # --- 3. CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="RAG Course Bot", page_icon="🎓")
+
 
 st.title("🎓 Assistant de Cours MLOps")
 st.markdown("""
@@ -81,4 +90,5 @@ if prompt := st.chat_input("Votre question (ex: 'C'est quoi le Vanishing Gradien
             except Exception as e:
                 st.error("Oups, une erreur est survenue lors de la génération.")
                 st.write(e)
+
 
