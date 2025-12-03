@@ -1,39 +1,48 @@
 import os
+import re
 from pathlib import Path
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-import pandas as pd
+# Utiliser le même chemin que download_data.py
+LOCAL_RAW_DATA_DIR = "data/raw" 
 
-RAW_DIR = Path("data/raw")
-PROCESSED_DIR = Path("data/processed")
-CORPUS_PATH = PROCESSED_DIR / "corpus.parquet"
+def clean_text(text):
+    """Nettoyage de base du texte."""
+    text = re.sub(r'PAGE \d+', '', text)
+    text = re.sub(r'2025-26', '', text)
+    text = re.sub(r'Sarah Malaeb', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
+def process_documents():
+    """Charge les PDF, nettoie et divise en chunks."""
+    documents = []
+    
+    pdf_files = list(Path(LOCAL_RAW_DATA_DIR).glob("*.pdf"))
+    if not pdf_files:
+        print(f"❌ Erreur : Aucun PDF trouvé dans {LOCAL_RAW_DATA_DIR}. Le téléchargement a-t-il réussi ?")
+        return []
 
-def main():
-    """
-    Read raw documents and build a cleaned, chunked text corpus.
+    for file_path in pdf_files:
+        print(f"Processing: {file_path.name}...")
+        loader = PyPDFLoader(str(file_path))
+        docs = loader.load()
+        
+        for doc in docs:
+            doc.page_content = clean_text(doc.page_content)
+            doc.metadata["source_file"] = file_path.name
+        
+        documents.extend(docs)
 
-    For now, this creates an empty corpus with the right columns.
-    Later you will:
-      - read pdf or ppt files
-      - extract text
-      - split into chunks
-      - fill the dataframe
-    """
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-
-    df = pd.DataFrame(
-        columns=[
-            "id",        # unique chunk id
-            "source",    # file name or url
-            "page",      # page number if pdf
-            "chunk_id",  # chunk index inside the page or file
-            "text",      # text content of the chunk
-        ]
+    # Chunking
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=800,
+        chunk_overlap=100
     )
-
-    df.to_parquet(CORPUS_PATH)
-    print(f"Empty corpus saved to: {CORPUS_PATH.resolve()}")
-
+    chunks = text_splitter.split_documents(documents)
+    print(f"✅ Génération terminée : {len(chunks)} chunks.")
+    return chunks
 
 if __name__ == "__main__":
-    main()
+    process_documents()
