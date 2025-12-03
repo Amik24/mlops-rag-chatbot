@@ -4,13 +4,10 @@ import os
 import boto3
 from pathlib import Path
 
-# --- IMPORTANT : Préparer le chemin Python pour les imports locaux ---
-# Tente de rendre le dossier racine (/mount/src/mlops-rag-chatbot) accessible
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-
-# Importation de la classe RAGModel (Doit être dans src/model/model_pipeline.py)
-# Note: La structure des imports a été simplifiée ici.
+# --- Importation du module RAG (Syntaxe fiable de package) ---
 from src.model.model_pipeline import RAGModel 
+
+# Le reste de votre code...
 
 # --- Fonctions Clés pour le Déploiement Cloud ---
 
@@ -101,3 +98,4 @@ if prompt := st.chat_input("Posez votre question ici... (ex: 'Qu'est-ce que le R
                 st.error(response_text)
             
     st.session_state.messages.append({"role": "assistant", "content": response_text})
+
