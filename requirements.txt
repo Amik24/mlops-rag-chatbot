@@ -1,30 +1,31 @@
 # --- Frameworks & UI ---
-streamlit>=1.28.0
-pandas>=2.0.0
-python-dotenv>=1.0.0  # Maintenu pour le test local
+streamlit==1.32.0
+pandas==2.2.0
+python-dotenv==1.0.1
 
-# --- Core LangChain (Nouvelle API) ---
-langchain>=0.1.0
-langchain-core>=0.1.0
-langchain-community>=0.0.20
-
-# --- Lecture de Documents PDF ---
-pypdf>=3.17.0  # Nécessaire pour PyPDFLoader
+# --- Core LangChain (VERSIONS FIGÉES POUR STABILITÉ) ---
+# Ces versions précises fonctionnent ensemble et contiennent le module 'chains.combine_documents'
+langchain==0.1.20
+langchain-core==0.1.52
+langchain-community==0.0.38
+langchain-text-splitters==0.0.1
 
 # --- Providers Spécifiques ---
-langchain-groq>=0.0.1       # Pour l'intégration du LLM Groq (ChatGroq)
-langchain-huggingface>=0.0.1  # Pour HuggingFaceEmbeddings
+langchain-groq==0.1.3
+langchain-huggingface==0.0.1
 
-# --- Embeddings et Transformers ---
+# --- Lecture de Documents PDF ---
+pypdf==4.2.0
+
+# --- Embeddings et Vector Store ---
+sentence-transformers==2.6.1
+faiss-cpu==1.8.0
+
+# --- Dépendances Système & AWS ---
+boto3==1.34.0
+numpy==1.26.0
+
+# --- Gestion des dépendances torch (Optimisation taille) ---
+# Laisser sentence-transformers gérer torch, mais on évite les majeurs conflits
+torch>=2.0.0
 transformers>=4.30.0
-sentence-transformers>=2.2.0  # Requis pour les embeddings HuggingFace
-torch>=2.0.0  # Requis par sentence-transformers (version CPU)
-
-# --- Vector Store ---
-faiss-cpu>=1.7.4
-
-# --- AWS pour S3 ---
-boto3>=1.28.0
-
-# --- Dépendances supplémentaires utiles ---
-numpy>=1.24.0
