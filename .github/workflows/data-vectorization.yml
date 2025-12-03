@@ -15,7 +15,7 @@ env:
   # Configuration des ressources créées par le groupe 1
   AWS_REGION: ${{ secrets.AWS_REGION }}
   S3_BUCKET_NAME: "g1-data"
-  # Chemin de destination pour l'artefact index vectoriel
+  # Chemin de destination (Dossier) pour l'artefact index vectoriel
   S3_ARTIFACT_KEY: "artifacts/vector_index/faiss_index" 
   PYTHON_VERSION: "3.10"
   
@@ -49,18 +49,25 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       # --- Exécution du Data Pipeline (Vectorisation) ---
-      # Le script data_pipeline.py orchestre download, chunking, et build_embeddings.
-      # Il doit générer le fichier d'index localement dans 'models/faiss_index.bin'.
       - name: Execute Vectorization Pipeline
         run: |
           echo "Starting RAG data vectorization pipeline..."
+          # Ce script génère le dossier 'models/faiss_index' (sans .bin)
           python src/data/data_pipeline.py
+          
+          # Vérification (Debug) : Affiche le contenu généré pour être sûr
+          echo "📂 Contenu généré dans models/ :"
+          ls -R models/
           echo "Pipeline execution complete."
 
       # --- Déploiement de l'Artefact Index vers S3 ---
       - name: Deploy Vector Index Artifact to S3
         run: |
           echo "Uploading generated artifact to S3: s3://${{ env.S3_BUCKET_NAME }}/${{ env.S3_ARTIFACT_KEY }}"
-          # Utilisation de l'AWS CLI (s3 cp) pour la persistance durable
-          aws s3 cp models/faiss_index.bin s3://${{ env.S3_BUCKET_NAME }}/${{ env.S3_ARTIFACT_KEY }}
+          
+          # CORRECTION CRUCIALE ICI :
+          # 1. On cible le dossier 'models/faiss_index' (pas le fichier .bin)
+          # 2. On ajoute '--recursive' pour copier tout le contenu du dossier
+          aws s3 cp models/faiss_index s3://${{ env.S3_BUCKET_NAME }}/${{ env.S3_ARTIFACT_KEY }} --recursive
+          
           echo "Artifact successfully deployed."
