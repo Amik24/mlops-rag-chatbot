@@ -8,7 +8,7 @@ env:
   # Utilisation des secrets pour la configuration de l'environnement AWS
   AWS_REGION: ${{ secrets.AWS_REGION }} 
   S3_BUCKET_NAME: "g1-data"
-  PYTHON_VERSION: "3.13.9"
+  PYTHON_VERSION: "3.10"
 
 jobs:
   check_s3_access:
