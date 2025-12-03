@@ -1,20 +1,46 @@
 import os
+import boto3
 from pathlib import Path
 
-RAW_DIR = Path("data/raw")
+# --- Configuration S3 ---
+S3_BUCKET_NAME = "g1-data"
+S3_PREFIX = "raw/"
+# Le dossier de téléchargement local (sur le runner CI/CD)
+LOCAL_DOWNLOAD_DIR = "data/raw" 
 
+def download_pdfs():
+    """Télécharge les PDF depuis S3 vers le répertoire local du runner."""
+    
+    # Boto3 lira les clés SSO depuis l'environnement (variables d'environnement)
+    try:
+        s3 = boto3.client(
+            's3', 
+            region_name=os.environ.get("AWS_REGION")
+        )
+    except Exception as e:
+        print(f"Erreur lors de l'initialisation de Boto3 : {e}")
+        return
 
-def main():
-    """
-    Prepare the folder for raw course files (pdf, ppt, etc).
+    # Créer le répertoire local pour les PDF
+    Path(LOCAL_DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
+    
+    print(f"Téléchargement des PDF depuis s3://{S3_BUCKET_NAME}/{S3_PREFIX}")
 
-    For now, this just creates the folder.
-    Later you can add logic to copy or download files.
-    """
-    RAW_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"Raw data folder ready at: {RAW_DIR.resolve()}")
-    print("Place your course pdf or ppt files in this folder.")
+    # Lister et télécharger les objets
+    response = s3.list_objects_v2(Bucket=S3_BUCKET_NAME, Prefix=S3_PREFIX)
+        
+    if 'Contents' in response:
+        files_downloaded = 0
+        for obj in response['Contents']:
+            key = obj['Key']
+            # Éviter de télécharger le dossier racine si S3 le liste
+            if key.lower().endswith('.pdf'):
+                local_file_path = Path(LOCAL_DOWNLOAD_DIR) / Path(key).name
+                s3.download_file(S3_BUCKET_NAME, key, str(local_file_path))
+                files_downloaded += 1
+        print(f"✅ {files_downloaded} PDF téléchargés avec succès.")
+    else:
+        print("❌ Avertissement : Aucun fichier PDF trouvé dans le chemin S3 spécifié.")
 
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    download_pdfs()
