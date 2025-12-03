@@ -1,12 +1,13 @@
-name: Test de Connexion AWS S3 (Clés Temporaires)
+name: AWS Connection Health Check (S3 Access)
 
 on:
- 
+  # Déclenchement manuel pour les vérifications de l'administrateur
   workflow_dispatch:
 
 env:
+  # Utilisation des secrets pour la configuration de l'environnement AWS
   AWS_REGION: ${{ secrets.AWS_REGION }} 
-  S3_BUCKET_NAME: "g1-data" 
+  S3_BUCKET_NAME: "g1-data"
   PYTHON_VERSION: "3.13.9"
 
 jobs:
@@ -14,31 +15,31 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
+      - name: Set up Python Environment
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install AWS CLI
+      - name: Install AWS CLI for Testing
         run: |
           pip install awscli
 
-      # --- Configuration des identifiants AWS Temporaires (SSO) ---
+      # Configuration critique des identifiants temporaires SSO
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          # LIGNE CRUCIALE : Le jeton de session est la cause de l'erreur
+          # Utilisation du jeton de session nécessaire pour les identifiants SSO
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }} 
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Test Listing S3 Bucket
+      - name: Validate S3 Bucket Access
         run: |
-          echo "Tentative de listage du bucket S3 : ${{ env.S3_BUCKET_NAME }}"
-          # Utilise le nouveau nom du bucket
-          aws s3 ls s3://${{ env.S3_BUCKET_NAME }} 
-          echo "Connexion AWS réussie et accès S3 confirmé."
+          echo "Validating connectivity to S3 Bucket: ${{ env.S3_BUCKET_NAME }} in region ${{ env.AWS_REGION }}."
+          # Commande de vérification des permissions de lecture (ListBucket)
+          aws s3 ls s3://${{ env.S3_BUCKET_NAME }}
+          echo "AWS connection successful."
