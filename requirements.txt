@@ -1,19 +1,19 @@
-# --- Frameworks principaux ---
+# --- Frameworks & UI ---
 streamlit
-langchain
-langchain-community 
-langchain-groq
-# --- Manipulation de PDF ---
-pypdf
-
-# --- Embeddings et Vector Stores ---
-sentence-transformers
-faiss-cpu
-
-# --- AWS SDK (pour S3 et utilitaires) ---
-boto3
-awscli
-
-# --- Utilitaires ---
-numpy
 pandas
+python-dotenv  # Maintenu pour le test local
+
+# --- Core LangChain et Utilitaire ---
+langchain
+langchain-community  # Contient PyPDFLoader et FAISS
+pypdf  # Nécessaire pour les documents PDF
+
+# --- Providers Spécifiques ---
+langchain-groq       # Pour l'intégration du LLM Groq (ChatGroq)
+# HuggingFaceEmbeddings est inclus dans langchain-community, 
+# mais nous ajoutons la dépendance transformers pour le modèle:
+transformers         
+sentence-transformers # Pour les embeddings (HuggingFaceEmbeddings utilise sentence-transformers)
+
+# --- Vector Store ---
+faiss-cpu
