@@ -1,12 +1,13 @@
 name: Test de Connexion AWS S3 (Clés Temporaires)
 
 on:
+ 
   workflow_dispatch:
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  S3_BUCKET_NAME: "groupe1-data"
-  PYTHON_VERSION: "3.13.9"  # <--- MISE À JOUR DE LA VERSION PYTHON
+  AWS_REGION: ${{ secrets.AWS_REGION }} 
+  S3_BUCKET_NAME: "g1-data" 
+  PYTHON_VERSION: "3.13.9"
 
 jobs:
   check_s3_access:
@@ -31,11 +32,13 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # LIGNE CRUCIALE : Le jeton de session est la cause de l'erreur
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }} 
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Test Listing S3 Bucket
         run: |
           echo "Tentative de listage du bucket S3 : ${{ env.S3_BUCKET_NAME }}"
-          aws s3 ls s3://${{ env.S3_BUCKET_NAME }}
+          # Utilise le nouveau nom du bucket
+          aws s3 ls s3://${{ env.S3_BUCKET_NAME }} 
           echo "Connexion AWS réussie et accès S3 confirmé."
