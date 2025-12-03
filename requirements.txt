@@ -6,7 +6,8 @@ python-dotenv  # Maintenu pour le test local
 # --- Core LangChain et Utilitaire ---
 langchain
 langchain-community  # Contient PyPDFLoader et FAISS
-pypdf  # Nécessaire pour les documents PDF
+pypdf
+langchain-core   # Nécessaire pour les documents PDF
 
 # --- Providers Spécifiques ---
 langchain-groq       # Pour l'intégration du LLM Groq (ChatGroq)
