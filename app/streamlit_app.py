@@ -4,45 +4,32 @@ import os
 import boto3
 from pathlib import Path
 
-# --- CORRECTION DE L'IMPORTATION LOCALE (ModuleNotFoundError) ---
-
-# Calcule le chemin absolu de la racine du dépôt (remonte d'un seul niveau : de 'app' à 'mlops-rag-chatbot')
+# --- Correction de l'importation Locale (Force le chemin de la racine) ---
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-
-# Ajoute ce chemin à la liste des chemins Python pour que 'src' soit trouvé
 if project_root not in sys.path:
-    sys.path.insert(0, project_root) # Utiliser insert(0) pour la priorité la plus haute
+    sys.path.insert(0, project_root)
 
-# L'importation devrait maintenant fonctionner si 'src' est bien à la racine du dépôt
 from src.model.model_pipeline import RAGModel 
-# --- FIN DE LA CORRECTION ---
-
 
 # --- Fonctions Clés pour le Déploiement Cloud ---
 
 def setup_environment():
-    """
-    Lit les secrets Streamlit et les injecte dans os.environ.
-    """
+    """ Lit les secrets Streamlit et les injecte dans os.environ. """
+    # L'application Streamlit va afficher l'erreur détaillée si un secret est manquant.
     if not hasattr(st, 'secrets'):
-        st.error("❌ Erreur : Les secrets Streamlit ne sont pas configurés. Arrêt.")
         return False
         
     try:
-        # Clés AWS pour Boto3 (utilisées dans RAGModel.load_model pour le téléchargement S3)
+        # Clés AWS et Groq
         os.environ["AWS_ACCESS_KEY_ID"] = st.secrets["AWS_ACCESS_KEY_ID"]
         os.environ["AWS_SECRET_ACCESS_KEY"] = st.secrets["AWS_SECRET_ACCESS_KEY"]
         os.environ["AWS_SESSION_TOKEN"] = st.secrets["AWS_SESSION_TOKEN"] 
         os.environ["AWS_REGION"] = st.secrets["AWS_REGION"] 
-        
-        # Clé Groq (LLM)
         os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
         
-        print("✅ Variables d'environnement configurées.")
         return True
     except KeyError as e:
-        st.error(f"❌ Erreur de configuration de secret : La clé {e} est manquante dans les Secrets Streamlit Cloud.")
-        st.info("Veuillez vérifier que les secrets AWS et GROQ sont correctement définis.")
+        st.error(f"❌ Erreur de configuration : Le secret {e} est manquant.")
         return False
 
 
@@ -55,17 +42,15 @@ st.markdown("Posez vos questions sur le NLP, le SVM, les RNNs, et les Transforme
 
 # 1. Configuration de l'environnement au début
 if not setup_environment():
-    # Si les secrets sont manquants, l'application s'arrête ici
     st.stop()
 
 
-# 2. Initialisation du Modèle (téléchargement S3 intégré dans RAGModel.load_model())
+# 2. Initialisation du Modèle
 if "rag" not in st.session_state:
     st.session_state.rag = RAGModel()
     
     with st.spinner("Chargement de la Base de Connaissances depuis S3..."):
         try:
-            # Cette méthode va télécharger l'index FAISS depuis S3
             st.session_state.rag.load_model()
             st.success("✅ Modèle RAG chargé !")
         except FileNotFoundError as e:
@@ -96,13 +81,13 @@ if prompt := st.chat_input("Posez votre question ici... (ex: 'Qu'est-ce que le R
             if getattr(st.session_state.rag, 'qa_chain', None):
                 answer, sources = st.session_state.rag.predict(prompt)
                 
-                # Formatage des sources
+                # Formatage des sources (utilise les résultats de la méthode predict)
                 sources_list = [f"**{src.split('/')[-1]}**" for src in sources]
                 
                 response_text = f"{answer}\n\n---\n\n📚 **Sources utilisées :** {', '.join(sources_list) if sources_list else 'Aucune source pertinente trouvée.'}"
                 st.markdown(response_text)
             else:
-                response_text = "Désolé, le modèle n'a pas pu charger. Vérifiez les logs d'erreur et le statut du workflow."
+                response_text = "Désolé, le modèle n'a pas pu charger. Veuillez vérifier les logs d'erreur."
                 st.error(response_text)
             
     st.session_state.messages.append({"role": "assistant", "content": response_text})
