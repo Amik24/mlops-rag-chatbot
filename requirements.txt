@@ -14,6 +14,7 @@ langchain-groq       # Pour l'intégration du LLM Groq (ChatGroq)
 # mais nous ajoutons la dépendance transformers pour le modèle:
 transformers         
 sentence-transformers # Pour les embeddings (HuggingFaceEmbeddings utilise sentence-transformers)
+langchain-huggingface
 
 # --- Vector Store ---
 faiss-cpu
