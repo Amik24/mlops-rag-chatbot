@@ -1,10 +1,19 @@
+# --- Frameworks principaux ---
 streamlit
 langchain
 langchain-community 
-sentence-transformers
+
+# --- Manipulation de PDF ---
 pypdf
-faiss-cpu 
-numpy
-pandas
+
+# --- Embeddings et Vector Stores ---
+sentence-transformers
+faiss-cpu
+
+# --- AWS SDK (pour S3 et utilitaires) ---
 boto3
 awscli
+
+# --- Utilitaires ---
+numpy
+pandas
