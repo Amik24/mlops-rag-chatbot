@@ -1,20 +1,24 @@
 import os
 import boto3
 import shutil
+import sys
+from dotenv import load_dotenv
+
+# --- IMPORTS LANGCHAIN STANDARD ---
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-
-# --- CORRECTION DES IMPORTS (V1.0+) ---
-# Les chaînes sont maintenant dans langchain_classic
-from langchain_classic.chains.retrieval import create_retrieval_chain
-from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
-from dotenv import load_dotenv
+
+# --- CORRECTION ICI : ON UTILISE LES CHEMINS OFFICIELS ---
+# (Pas de 'langchain_classic', ça n'existe pas !)
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
 
 load_dotenv()
 
 # Configuration S3
+# Note : Assure-toi que ces chemins correspondent bien à ce que tu as dans ton S3
 S3_BUCKET_NAME = "g1-data"
 S3_ARTIFACT_PATH = "artifacts/vector_index/faiss_index"
 LOCAL_INDEX_PATH = "/tmp/faiss_index_g1"
@@ -28,37 +32,48 @@ class RAGModel:
         """Télécharge l'index FAISS depuis S3."""
         print(f"🔄 Téléchargement de l'index depuis S3 ({S3_BUCKET_NAME})...")
         
+        # Nettoyage du dossier local s'il existe déjà pour éviter les conflits
         if os.path.exists(LOCAL_INDEX_PATH):
             shutil.rmtree(LOCAL_INDEX_PATH)
         os.makedirs(LOCAL_INDEX_PATH)
 
         try:
+            # Boto3 va utiliser les variables d'env chargées par streamlit_app.py
             s3 = boto3.client('s3')
             files = ["index.faiss", "index.pkl"]
+            
             for file in files:
-                s3.download_file(S3_BUCKET_NAME, f"{S3_ARTIFACT_PATH}/{file}", f"{LOCAL_INDEX_PATH}/{file}")
-            print("✅ Index FAISS téléchargé.")
+                source = f"{S3_ARTIFACT_PATH}/{file}"
+                destination = f"{LOCAL_INDEX_PATH}/{file}"
+                print(f"   📥 Téléchargement de {file}...")
+                s3.download_file(S3_BUCKET_NAME, source, destination)
+            
+            print("✅ Index FAISS téléchargé avec succès.")
         except Exception as e:
-            raise Exception(f"Erreur S3 : Impossible de télécharger l'index. Avez-vous lancé le workflow GitHub ? Détails: {e}")
+            # Message d'erreur détaillé pour t'aider si S3 bloque
+            raise Exception(f"Erreur S3 critique : Impossible de télécharger l'index depuis {S3_BUCKET_NAME}/{S3_ARTIFACT_PATH}. \nErreur: {str(e)}")
 
     def load_model(self):
-        # 1. Télécharger
+        # 1. Télécharger les données
         self._download_index_from_s3()
 
         print("🧠 Chargement des Embeddings...")
         embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-        # 2. Charger FAISS
-        self.vector_store = FAISS.load_local(
-            LOCAL_INDEX_PATH, 
-            embeddings, 
-            allow_dangerous_deserialization=True
-        )
+        # 2. Charger FAISS depuis le dossier temporaire
+        try:
+            self.vector_store = FAISS.load_local(
+                LOCAL_INDEX_PATH, 
+                embeddings, 
+                allow_dangerous_deserialization=True
+            )
+        except Exception as e:
+            raise Exception(f"Erreur lors du chargement de FAISS (fichiers corrompus ?): {e}")
 
         # 3. LLM (Groq)
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
-            raise ValueError("GROQ_API_KEY manquante dans les secrets !")
+            raise ValueError("GROQ_API_KEY est manquante ! Vérifie tes 'Secrets' Streamlit.")
 
         llm = ChatGroq(
             temperature=0.3, 
@@ -69,7 +84,9 @@ class RAGModel:
         # 4. Prompt
         prompt = ChatPromptTemplate.from_template("""
         You are a helpful assistant for MLOps students.
-        Answer based ONLY on the following context:
+        Answer based ONLY on the following context provided.
+        If the answer is not in the context, say "I don't know based on the documents".
+
         <context>
         {context}
         </context>
@@ -78,9 +95,10 @@ class RAGModel:
         Answer:
         """)
 
-        # 5. Chaîne (Via langchain_classic)
+        # 5. Chaîne RAG (Correction appliquée ici aussi)
         question_answer_chain = create_stuff_documents_chain(llm, prompt)
         retriever = self.vector_store.as_retriever(search_kwargs={"k": 4})
+        
         self.qa_chain = create_retrieval_chain(retriever, question_answer_chain)
 
     def predict(self, query):
@@ -88,4 +106,10 @@ class RAGModel:
             self.load_model()
         
         response = self.qa_chain.invoke({"input": query})
-        return response['answer'], [doc.metadata.get('source_file', 'Doc') for doc in response['context']]
+        
+        # Gestion sécurisée des sources
+        sources = []
+        if "context" in response:
+            sources = [doc.metadata.get('source', 'Doc inconnu') for doc in response['context']]
+            
+        return response['answer'], sources
