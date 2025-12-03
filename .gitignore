@@ -1,7 +1,28 @@
-venv/
+# ----------------------------------------------------------------------
+# 1. ENVIRONNEMENT PYTHON
+# Fichiers et dossiers générés localement qui ne doivent pas être versionnés
+# ----------------------------------------------------------------------
+.venv/
+env/
 __pycache__/
 *.pyc
-.ipynb_checkpoints/
-data/
-.env
+
+# ----------------------------------------------------------------------
+# 2. DONNÉES ET ARTEFACTS GENERÉS (STOCKAGE CLOUD)
+# Ces fichiers sont des ARTEFACTS générés par le pipeline CI/CD et stockés
+# sur S3. Ils ne doivent pas être committés car ils sont volumineux.
+# ----------------------------------------------------------------------
+/data/raw/             # Documents bruts (PDFs) - Stockés sur S3.
+/data/processed/       # Chunks de texte nettoyés - Stockés sur S3 ou ignorés.
+/models/               # Contient les index vectoriels et modèles sauvegardés.
+*.bin                  # Fichiers binaires (ex: Index vectoriel FAISS).
+*.joblib               # Modèles Python sauvegardés (pickle/joblib).
+*.pickle
+*.index                # Fichiers d'index génériques.
+
+# ----------------------------------------------------------------------
+# 3. OUTILS ET ÉDITEURS LOCAUX
+# ----------------------------------------------------------------------
 .DS_Store
+.ipynb_checkpoints/    # Fichiers de sauvegarde Jupyter Notebooks.
+.env                   # Variables d'environnement locales (secrets).
