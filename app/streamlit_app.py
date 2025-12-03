@@ -15,8 +15,8 @@ if "GROQ_API_KEY" in st.secrets:
     os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 # --- 2. CONFIGURATION DES CHEMINS ---
-# Permet de trouver les modules 'src' même depuis Streamlit Cloud
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+# Le fichier est dans 'app/', donc on remonte d'UN niveau ('..') pour trouver 'src/'
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 # On importe le modèle SEULEMENT après avoir injecté les secrets
 try:
@@ -81,3 +81,4 @@ if prompt := st.chat_input("Votre question (ex: 'C'est quoi le Vanishing Gradien
             except Exception as e:
                 st.error("Oups, une erreur est survenue lors de la génération.")
                 st.write(e)
+
