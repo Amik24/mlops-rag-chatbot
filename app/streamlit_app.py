@@ -18,7 +18,7 @@ except ImportError as e:
 
 # --- 2. CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="RAG Course Bot", page_icon="🎓")
-st.title("🎓 Assistant de Cours MLOps")
+st.title("🎓 Assistant de Cours")
 
 # --- 3. LE SECRET ANTI-CRASH (CACHE) ---
 # Empêche Streamlit de recharger le modèle à chaque clic (évite le Timeout 503)
@@ -82,3 +82,4 @@ if prompt := st.chat_input("Votre question (ex: 'C'est quoi un Transformer ?')..
             except Exception as e:
                 st.error("Oups, une erreur est survenue.")
                 st.write(f"Erreur : {e}")
+
