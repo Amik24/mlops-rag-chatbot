@@ -4,21 +4,18 @@ import shutil
 import sys
 from dotenv import load_dotenv
 
-# --- IMPORTS LANGCHAIN STANDARD ---
+# --- IMPORTS SECURISES POUR CPU ---
 from langchain_groq import ChatGroq
-from langchain_huggingface import HuggingFaceEmbeddings
+# On utilise la version community pour éviter le crash CPU "Meta Tensor"
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import ChatPromptTemplate
-
-# --- CORRECTION ICI : ON UTILISE LES CHEMINS OFFICIELS ---
-# (Pas de 'langchain_classic', ça n'existe pas !)
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 
 load_dotenv()
 
-# Configuration S3
-# Note : Assure-toi que ces chemins correspondent bien à ce que tu as dans ton S3
+# Configuration
 S3_BUCKET_NAME = "g1-data"
 S3_ARTIFACT_PATH = "artifacts/vector_index/faiss_index"
 LOCAL_INDEX_PATH = "/tmp/faiss_index_g1"
@@ -29,54 +26,45 @@ class RAGModel:
         self.qa_chain = None
 
     def _download_index_from_s3(self):
-        """Télécharge l'index FAISS depuis S3."""
-        print(f"🔄 Téléchargement de l'index depuis S3 ({S3_BUCKET_NAME})...")
+        print(f"🔄 Début du téléchargement S3 ({S3_BUCKET_NAME})...")
 
-        # Nettoyage du dossier local s'il existe déjà pour éviter les conflits
-        # Nettoyage du dossier temporaire
         if os.path.exists(LOCAL_INDEX_PATH):
             shutil.rmtree(LOCAL_INDEX_PATH)
         os.makedirs(LOCAL_INDEX_PATH)
 
         try:
-            # Boto3 va utiliser les variables d'env chargées par streamlit_app.py
-            s3 = boto3.client('s3')
-            files = ["index.faiss", "index.pkl"]
-            # CORRECTION : On force la région ici avec os.getenv
-            region = os.getenv("AWS_REGION", "eu-west-3") # Par défaut eu-west-3 si non trouvé
-            s3 = boto3.client('s3', region_name=region)
+            # Client S3 optimisé avec région explicite
+            s3 = boto3.client(
+                's3', 
+                region_name=os.getenv("AWS_REGION", "eu-west-3"),
+                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY")
+            )
 
-            # Téléchargement des 2 fichiers vitaux
             files = ["index.faiss", "index.pkl"]
             for file in files:
                 source = f"{S3_ARTIFACT_PATH}/{file}"
                 destination = f"{LOCAL_INDEX_PATH}/{file}"
                 print(f"   📥 Téléchargement de {file}...")
                 s3.download_file(S3_BUCKET_NAME, source, destination)
-                # Construction du chemin S3 précis
-                s3_key = f"{S3_ARTIFACT_PATH}/{file}"
-                local_dest = f"{LOCAL_INDEX_PATH}/{file}"
-                
-                print(f"⬇️ Downloading {s3_key}...")
-                s3.download_file(S3_BUCKET_NAME, s3_key, local_dest)
 
-            print("✅ Index FAISS téléchargé avec succès.")
             print("✅ Index FAISS téléchargé.")
+        
         except Exception as e:
-            # Message d'erreur détaillé pour t'aider si S3 bloque
-            raise Exception(f"Erreur S3 critique : Impossible de télécharger l'index depuis {S3_BUCKET_NAME}/{S3_ARTIFACT_PATH}. \nErreur: {str(e)}")
-            # On affiche la région utilisée dans l'erreur pour le débogage
-            current_region = os.getenv('AWS_REGION')
-            raise Exception(f"Erreur S3 (Region: {current_region}) : Impossible de télécharger l'index. Détails: {e}")
+            raise Exception(f"Erreur S3 : {str(e)}")
 
     def load_model(self):
-        # 1. Télécharger les données
+        # 1. Téléchargement
         self._download_index_from_s3()
 
-        print("🧠 Chargement des Embeddings...")
-        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        print("🧠 Chargement des Embeddings (Force CPU)...")
+        # 2. Embeddings optimisés CPU
+        embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_kwargs={'device': 'cpu'}
+        )
 
-        # 2. Charger FAISS depuis le dossier temporaire
+        # 3. Chargement FAISS
         try:
             self.vector_store = FAISS.load_local(
                 LOCAL_INDEX_PATH, 
@@ -84,12 +72,11 @@ class RAGModel:
                 allow_dangerous_deserialization=True
             )
         except Exception as e:
-            raise Exception(f"Erreur lors du chargement de FAISS (fichiers corrompus ?): {e}")
+            raise Exception(f"Erreur lecture FAISS : {e}")
 
-        # 3. LLM (Groq)
+        # 4. LLM & Chain
         api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            raise ValueError("GROQ_API_KEY est manquante ! Vérifie tes 'Secrets' Streamlit.")
+        if not api_key: raise ValueError("GROQ_API_KEY manquante.")
 
         llm = ChatGroq(
             temperature=0.3, 
@@ -97,35 +84,18 @@ class RAGModel:
             api_key=api_key
         )
 
-        # 4. Prompt
         prompt = ChatPromptTemplate.from_template("""
-        You are a helpful assistant for MLOps students.
-        Answer based ONLY on the following context provided.
-        If the answer is not in the context, say "I don't know based on the documents".
-
-        <context>
-        {context}
-        </context>
-        
+        Answer based ONLY on the context below.
+        <context>{context}</context>
         Question: {input}
-        Answer:
         """)
 
-        # 5. Chaîne RAG (Correction appliquée ici aussi)
-        question_answer_chain = create_stuff_documents_chain(llm, prompt)
+        chain = create_stuff_documents_chain(llm, prompt)
         retriever = self.vector_store.as_retriever(search_kwargs={"k": 4})
-
-        self.qa_chain = create_retrieval_chain(retriever, question_answer_chain)
+        self.qa_chain = create_retrieval_chain(retriever, chain)
 
     def predict(self, query):
-        if not self.qa_chain:
-            self.load_model()
-
+        if not self.qa_chain: self.load_model()
         response = self.qa_chain.invoke({"input": query})
-
-        # Gestion sécurisée des sources
-        sources = []
-        if "context" in response:
-            sources = [doc.metadata.get('source', 'Doc inconnu') for doc in response['context']]
-
+        sources = [doc.metadata.get('source', 'Inconnu') for doc in response.get('context', [])]
         return response['answer'], sources
