@@ -1,3 +1,60 @@
+# --- DÉBUT DU BLOC DE DEBUG S3 ---
+import boto3
+import streamlit as st
+import os
+
+st.divider()
+st.subheader("🕵️‍♂️ Diagnostic S3 en direct")
+
+try:
+    # 1. Test de connexion
+    s3_test = boto3.client(
+        's3',
+        region_name=st.secrets["AWS_REGION"],
+        aws_access_key_id=st.secrets["AWS_ACCESS_KEY_ID"],
+        aws_secret_access_key=st.secrets["AWS_SECRET_ACCESS_KEY"]
+    )
+    
+    # 2. Qui suis-je ?
+    identity = boto3.client(
+        'sts',
+        region_name=st.secrets["AWS_REGION"],
+        aws_access_key_id=st.secrets["AWS_ACCESS_KEY_ID"],
+        aws_secret_access_key=st.secrets["AWS_SECRET_ACCESS_KEY"]
+    ).get_caller_identity()
+    st.write(f"🔑 Connecté en tant que : `{identity['Arn']}`")
+
+    # 3. Liste des buckets visibles
+    st.write("📦 Buckets visibles par ces clés :")
+    buckets = s3_test.list_buckets()
+    found_g1 = False
+    for b in buckets['Buckets']:
+        st.code(f"- {b['Name']}")
+        if b['Name'] == "g1-data":
+            found_g1 = True
+    
+    if not found_g1:
+        st.error("❌ Le bucket 'g1-data' n'est PAS dans la liste ! Vérifiez le nom ou les droits.")
+    else:
+        st.success("✅ Le bucket 'g1-data' est bien visible.")
+        
+        # 4. Vérification du fichier spécifique
+        # ATTENTION : Vérifiez que ce chemin correspond à votre structure S3
+        prefix = "artifacts/vector_index/faiss_index/" 
+        st.write(f"📂 Recherche de fichiers dans : `g1-data/{prefix}`")
+        
+        objects = s3_test.list_objects_v2(Bucket="g1-data", Prefix=prefix)
+        if 'Contents' in objects:
+            for obj in objects['Contents']:
+                st.write(f"   📄 Trouvé : `{obj['Key']}` (Taille: {obj['Size']} bytes)")
+        else:
+            st.error(f"❌ Aucun fichier trouvé dans '{prefix}'. Le dossier est vide ou le chemin est faux.")
+
+except Exception as e:
+    st.error(f"💥 Erreur lors du diagnostic : {e}")
+
+st.divider()
+# --- FIN DU BLOC DE DEBUG S3 ---
 import os
 import boto3
 import shutil
@@ -121,3 +178,4 @@ class RAGModel:
             sources = [doc.metadata.get('source', 'Doc inconnu') for doc in response['context']]
             
         return response['answer'], sources
+
