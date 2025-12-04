@@ -6,19 +6,19 @@ from dotenv import load_dotenv
 
 # --- IMPORTS LANGCHAIN STANDARD ---
 from langchain_groq import ChatGroq
-# ⚠️ CORRECTION CRITIQUE : On utilise 'langchain_community' au lieu de 'langchain_huggingface'
-# Cela corrige l'erreur "Cannot copy out of meta tensor" sur Streamlit Cloud
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import ChatPromptTemplate
 
-# Imports pour les chaînes
+# --- CORRECTION ICI : ON UTILISE LES CHEMINS OFFICIELS ---
+# (Pas de 'langchain_classic', ça n'existe pas !)
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 
 load_dotenv()
 
 # Configuration S3
+# Note : Assure-toi que ces chemins correspondent bien à ce que tu as dans ton S3
 S3_BUCKET_NAME = "g1-data"
 S3_ARTIFACT_PATH = "artifacts/vector_index/faiss_index"
 LOCAL_INDEX_PATH = "/tmp/faiss_index_g1"
@@ -29,45 +29,52 @@ class RAGModel:
         self.qa_chain = None
 
     def _download_index_from_s3(self):
-        """Télécharge l'index FAISS depuis S3 avec authentification explicite."""
+        """Télécharge l'index FAISS depuis S3."""
         print(f"🔄 Téléchargement de l'index depuis S3 ({S3_BUCKET_NAME})...")
-        
+
+        # Nettoyage du dossier local s'il existe déjà pour éviter les conflits
         # Nettoyage du dossier temporaire
         if os.path.exists(LOCAL_INDEX_PATH):
             shutil.rmtree(LOCAL_INDEX_PATH)
         os.makedirs(LOCAL_INDEX_PATH)
 
         try:
-            # CORRECTION S3 : On passe tout explicitement pour éviter les erreurs 400/403
-            s3 = boto3.client(
-                's3',
-                region_name=os.getenv("AWS_REGION", "eu-west-3"),
-                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY")
-            )
-            
+            # Boto3 va utiliser les variables d'env chargées par streamlit_app.py
+            s3 = boto3.client('s3')
+            files = ["index.faiss", "index.pkl"]
+            # CORRECTION : On force la région ici avec os.getenv
+            region = os.getenv("AWS_REGION", "eu-west-3") # Par défaut eu-west-3 si non trouvé
+            s3 = boto3.client('s3', region_name=region)
+
+            # Téléchargement des 2 fichiers vitaux
             files = ["index.faiss", "index.pkl"]
             for file in files:
                 source = f"{S3_ARTIFACT_PATH}/{file}"
                 destination = f"{LOCAL_INDEX_PATH}/{file}"
                 print(f"   📥 Téléchargement de {file}...")
                 s3.download_file(S3_BUCKET_NAME, source, destination)
-            
+                # Construction du chemin S3 précis
+                s3_key = f"{S3_ARTIFACT_PATH}/{file}"
+                local_dest = f"{LOCAL_INDEX_PATH}/{file}"
+                
+                print(f"⬇️ Downloading {s3_key}...")
+                s3.download_file(S3_BUCKET_NAME, s3_key, local_dest)
+
+            print("✅ Index FAISS téléchargé avec succès.")
             print("✅ Index FAISS téléchargé.")
         except Exception as e:
-            raise Exception(f"Erreur S3 critique : Impossible de télécharger l'index. \nVérifiez vos Secrets Streamlit. \nDétails: {e}")
+            # Message d'erreur détaillé pour t'aider si S3 bloque
+            raise Exception(f"Erreur S3 critique : Impossible de télécharger l'index depuis {S3_BUCKET_NAME}/{S3_ARTIFACT_PATH}. \nErreur: {str(e)}")
+            # On affiche la région utilisée dans l'erreur pour le débogage
+            current_region = os.getenv('AWS_REGION')
+            raise Exception(f"Erreur S3 (Region: {current_region}) : Impossible de télécharger l'index. Détails: {e}")
 
     def load_model(self):
         # 1. Télécharger les données
         self._download_index_from_s3()
 
-        print("🧠 Chargement des Embeddings (Version Community Stable)...")
-        
-        # CORRECTION CPU : On force le device sur 'cpu' pour la stabilité
-        embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
-            model_kwargs={'device': 'cpu'}
-        )
+        print("🧠 Chargement des Embeddings...")
+        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
         # 2. Charger FAISS depuis le dossier temporaire
         try:
@@ -104,21 +111,21 @@ class RAGModel:
         Answer:
         """)
 
-        # 5. Chaîne RAG
+        # 5. Chaîne RAG (Correction appliquée ici aussi)
         question_answer_chain = create_stuff_documents_chain(llm, prompt)
         retriever = self.vector_store.as_retriever(search_kwargs={"k": 4})
-        
+
         self.qa_chain = create_retrieval_chain(retriever, question_answer_chain)
 
     def predict(self, query):
         if not self.qa_chain:
             self.load_model()
-        
+
         response = self.qa_chain.invoke({"input": query})
-        
+
         # Gestion sécurisée des sources
         sources = []
         if "context" in response:
             sources = [doc.metadata.get('source', 'Doc inconnu') for doc in response['context']]
-            
+
         return response['answer'], sources
