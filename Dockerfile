@@ -1,33 +1,32 @@
-# 1. On part d'une version légère de Python 3.10 (celle qui marche chez vous)
+# 1. Image de base (Python 3.10 comme sur Streamlit Cloud)
 FROM python:3.10-slim
 
-# 2. On évite que Python garde des fichiers de cache inutiles
+# 2. Variables d'environnement pour optimiser Python
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# 3. On crée le dossier de travail dans le conteneur
+# 3. Répertoire de travail
 WORKDIR /app
 
-# 4. On installe les dépendances système nécessaires pour AWS et Build tools
+# 4. Installation des outils système (nécessaire pour construire certaines libs)
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
-# 5. On copie d'abord les requirements pour profiter du cache Docker
+# 5. Copie et installation des dépendances (Cache Docker optimisé)
 COPY requirements.txt .
-
-# 6. Installation des librairies Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 7. On copie TOUT le reste du code (app/, src/, etc.) dans le conteneur
+# 6. Copie du code source
 COPY . .
 
-# 8. On indique sur quel port Streamlit écoute
+# 7. Port Streamlit par défaut
 EXPOSE 8501
 
-# 9. La commande de lancement (Healthcheck inclus pour éviter les timeouts)
+# 8. Vérification de santé (Healthcheck)
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
 
+# 9. Commande de lancement
 ENTRYPOINT ["streamlit", "run", "app/streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
