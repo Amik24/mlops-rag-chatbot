@@ -3,12 +3,11 @@ name: Deploy to AWS ECR
 on:
   push:
     branches:
-      - main  # Vérifiez si votre branche s'appelle 'main' ou 'master'
+      - main
 
 env:
   AWS_REGION: eu-west-3
   ECR_REPOSITORY: g1-mlops
-  # J'ai remis votre registre exact ici pour éviter les erreurs
   ECR_REGISTRY: 073184925698.dkr.ecr.eu-west-3.amazonaws.com
 
 jobs:
@@ -24,7 +23,7 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        # 👇 C'EST ICI LA CORRECTION POUR LES COMPTES ÉTUDIANTS 👇
+        # 👇 CETTE LIGNE EST OBLIGATOIRE POUR VOUS 👇
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: ${{ env.AWS_REGION }}
 
@@ -37,8 +36,6 @@ jobs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: latest
       run: |
-        # Construction de l'image
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        # Envoi vers AWS ECR
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        echo "✅ Image poussée avec succès : $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+        echo "✅ Image poussée avec succès"
