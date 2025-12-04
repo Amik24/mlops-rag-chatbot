@@ -1,93 +1,120 @@
-import streamlit as st
-import sys
 import os
+import boto3
+import shutil
+import sys
+from dotenv import load_dotenv
 
-# --- 1. CONFIGURATION DES CHEMINS (Vital pour l'import) ---
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, '..'))
-if project_root not in sys.path:
-    sys.path.append(project_root)
+# --- IMPORTS LANGCHAIN STANDARD ---
+from langchain_groq import ChatGroq
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_core.prompts import ChatPromptTemplate
 
-# Import du backend
-try:
-    from src.model.model_pipeline import RAGModel
-except ImportError as e:
-    st.error(f"❌ Erreur d'importation : {e}")
-    st.stop()
+# --- CORRECTION ICI : ON UTILISE LES CHEMINS OFFICIELS ---
+# (Pas de 'langchain_classic', ça n'existe pas !)
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
 
-# --- 2. CONFIGURATION DE LA PAGE ---
-st.set_page_config(page_title="RAG Course Bot", page_icon="🎓")
-st.title("🎓 Assistant de Cours MLOps")
+load_dotenv()
 
-# --- 3. LE SECRET ANTI-CRASH (CACHE) ---
-# @st.cache_resource permet de garder le modèle en mémoire
-# Cela évite de tout re-télécharger à chaque clic, ce qui cause le Timeout 503
-@st.cache_resource(show_spinner=False)
-def load_rag_model():
-    """Instancie et charge le modèle RAG une seule fois."""
-    model = RAGModel()
-    model.load_model() # C'est ici que ça prend du temps (Download S3 + HuggingFace)
-    return model
+# Configuration S3
+# Note : Assure-toi que ces chemins correspondent bien à ce que tu as dans ton S3
+S3_BUCKET_NAME = "g1-data"
+S3_ARTIFACT_PATH = "artifacts/vector_index/faiss_index"
+LOCAL_INDEX_PATH = "/tmp/faiss_index_g1"
 
-# --- 4. CHARGEMENT AVEC FEEDBACK VISUEL ---
-if "rag" not in st.session_state:
-    # On affiche un message pendant que la fonction cachée travaille
-    status_text = st.empty()
-    progress_bar = st.progress(0)
-    
-    try:
-        status_text.text("⏳ Initialisation : Téléchargement du modèle IA et des données S3...")
-        progress_bar.progress(20)
+class RAGModel:
+    def __init__(self):
+        self.vector_store = None
+        self.qa_chain = None
+
+    def _download_index_from_s3(self):
+        """Télécharge l'index FAISS depuis S3."""
+        print(f"🔄 Téléchargement de l'index depuis S3 ({S3_BUCKET_NAME})...")
         
-        # Appel de la fonction cachée (c'est elle qui fait le travail lourd)
-        st.session_state.rag = load_rag_model()
-        
-        progress_bar.progress(100)
-        status_text.success("✅ Assistant prêt ! Posez vos questions.")
-        
-    except Exception as e:
-        status_text.error("❌ Échec du chargement.")
-        st.error(f"Erreur technique : {e}")
-        st.stop()
+        # Nettoyage du dossier temporaire
+        if os.path.exists(LOCAL_INDEX_PATH):
+            shutil.rmtree(LOCAL_INDEX_PATH)
+        os.makedirs(LOCAL_INDEX_PATH)
 
-# --- 5. INTERFACE DE CHAT ---
-st.markdown("---")
-
-# Initialisation de l'historique
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Affichage des anciens messages
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# Zone de saisie
-if prompt := st.chat_input("Votre question (ex: 'C'est quoi un Transformer ?')..."):
-    # Afficher la question user
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    # Réponse de l'assistant
-    with st.chat_message("assistant"):
-        with st.spinner("🤔 Analyse de vos cours..."):
-            try:
-                # Prédiction
-                answer, sources = st.session_state.rag.predict(prompt)
-                
-                # Mise en forme de la réponse
-                response_text = f"{answer}\n\n"
-                if sources:
-                    response_text += "---\n**📚 Sources détectées :**\n"
-                    # On dédoublonne les sources pour faire propre
-                    unique_sources = list(set(sources))
-                    for src in unique_sources:
-                        response_text += f"- *{src}*\n"
-                
-                st.markdown(response_text)
-                st.session_state.messages.append({"role": "assistant", "content": response_text})
+        try:
+            # CORRECTION : On force la région ici avec os.getenv
+            region = os.getenv("AWS_REGION", "eu-west-3") # Par défaut eu-west-3 si non trouvé
+            s3 = boto3.client('s3', region_name=region)
             
-            except Exception as e:
-                st.error("Oups, une erreur est survenue.")
-                st.write(f"Erreur : {e}")
+            # Téléchargement des 2 fichiers vitaux
+            files = ["index.faiss", "index.pkl"]
+            for file in files:
+                # Construction du chemin S3 précis
+                s3_key = f"{S3_ARTIFACT_PATH}/{file}"
+                local_dest = f"{LOCAL_INDEX_PATH}/{file}"
+                
+                print(f"⬇️ Downloading {s3_key}...")
+                s3.download_file(S3_BUCKET_NAME, s3_key, local_dest)
+            
+            print("✅ Index FAISS téléchargé.")
+        except Exception as e:
+            # On affiche la région utilisée dans l'erreur pour le débogage
+            current_region = os.getenv('AWS_REGION')
+            raise Exception(f"Erreur S3 (Region: {current_region}) : Impossible de télécharger l'index. Détails: {e}")
+
+    def load_model(self):
+        # 1. Télécharger les données
+        self._download_index_from_s3()
+
+        print("🧠 Chargement des Embeddings...")
+        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+        # 2. Charger FAISS depuis le dossier temporaire
+        try:
+            self.vector_store = FAISS.load_local(
+                LOCAL_INDEX_PATH, 
+                embeddings, 
+                allow_dangerous_deserialization=True
+            )
+        except Exception as e:
+            raise Exception(f"Erreur lors du chargement de FAISS (fichiers corrompus ?): {e}")
+
+        # 3. LLM (Groq)
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY est manquante ! Vérifie tes 'Secrets' Streamlit.")
+
+        llm = ChatGroq(
+            temperature=0.3, 
+            model_name="llama-3.1-8b-instant",
+            api_key=api_key
+        )
+
+        # 4. Prompt
+        prompt = ChatPromptTemplate.from_template("""
+        You are a helpful assistant for MLOps students.
+        Answer based ONLY on the following context provided.
+        If the answer is not in the context, say "I don't know based on the documents".
+
+        <context>
+        {context}
+        </context>
+        
+        Question: {input}
+        Answer:
+        """)
+
+        # 5. Chaîne RAG (Correction appliquée ici aussi)
+        question_answer_chain = create_stuff_documents_chain(llm, prompt)
+        retriever = self.vector_store.as_retriever(search_kwargs={"k": 4})
+        
+        self.qa_chain = create_retrieval_chain(retriever, question_answer_chain)
+
+    def predict(self, query):
+        if not self.qa_chain:
+            self.load_model()
+        
+        response = self.qa_chain.invoke({"input": query})
+        
+        # Gestion sécurisée des sources
+        sources = []
+        if "context" in response:
+            sources = [doc.metadata.get('source', 'Doc inconnu') for doc in response['context']]
+            
+        return response['answer'], sources
