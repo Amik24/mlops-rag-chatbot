@@ -1,14 +1,13 @@
 import os
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-# Assurez-vous que l'import fonctionne (relatif ou absolu selon votre exécution)
+
 try:
     from clean_transform import process_documents
 except ImportError:
     from src.data.clean_transform import process_documents
 
 # CHEMIN CRITIQUE POUR LA CI/CD
-# Le workflow s'attend à trouver l'index ici pour le pousser sur S3
 CI_CD_OUTPUT_PATH = "models/faiss_index"
 
 def build_vector_store():
