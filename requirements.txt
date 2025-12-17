@@ -4,7 +4,6 @@ pandas>=2.1.0
 python-dotenv==1.0.1
 
 # --- Core LangChain (VERSIONS FIGÉES POUR STABILITÉ) ---
-# Ces versions précises fonctionnent ensemble et contiennent le module 'chains.combine_documents'
 langchain==0.1.20
 langchain-core==0.1.52
 langchain-community==0.0.38
@@ -26,6 +25,5 @@ boto3==1.34.0
 numpy==1.26.0
 
 # --- Gestion des dépendances torch (Optimisation taille) ---
-# Laisser sentence-transformers gérer torch, mais on évite les majeurs conflits
 torch>=2.0.0
 transformers>=4.30.0
