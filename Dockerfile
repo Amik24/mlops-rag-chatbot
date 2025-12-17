@@ -9,7 +9,6 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 # 4. Installation des outils système
-# CORRECTION : On a retiré 'software-properties-common' qui faisait planter le build
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
@@ -25,13 +24,19 @@ COPY . .
 # 7. Port
 EXPOSE 8501
 
-# 8. Healthcheck
+# 8. CONFIGURATION STREAMLIT FORCÉE (Fix)
+RUN mkdir -p /root/.streamlit
+RUN bash -c 'echo -e "\
+[server]\n\
+enableCORS = false\n\
+enableXsrfProtection = false\n\
+headless = true\n\
+address = \"0.0.0.0\"\n\
+port = 8501\n\
+" > /root/.streamlit/config.toml'
+
+# 9. Healthcheck
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
 
-# 9. Lancement
-ENTRYPOINT ["streamlit", "run", "src/app/streamlit_app.py", \
-            "--server.port=8501", \
-            "--server.address=0.0.0.0", \
-            "--server.enableCORS=false", \
-            "--server.enableXsrfProtection=false", \
-            "--server.fileWatcherType=none"]
+# 10. Lancement (Plus simple maintenant car la config est dans le fichier toml)
+ENTRYPOINT ["streamlit", "run", "src/app/streamlit_app.py"]
