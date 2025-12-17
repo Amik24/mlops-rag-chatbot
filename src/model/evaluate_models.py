@@ -2,7 +2,6 @@ import pandas as pd
 import os
 import sys
 
-# Ajouter le chemin 'src' pour les imports (essentiel pour que le runner CI/CD trouve RAGModel)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from src.model.model_pipeline import RAGModel 
@@ -18,7 +17,6 @@ def evaluate():
     # 1. Initialisation
     try:
         rag = RAGModel()
-        # La méthode load_model() gère le chargement de l'index FAISS depuis le disque local
         rag.load_model()
     except FileNotFoundError as e:
         print(f"❌ Échec de l'évaluation : {e}")
@@ -29,7 +27,7 @@ def evaluate():
         return
 
 
-    # 2. Cas de Test (Adaptés à vos cours, basés sur les titres des PDF)
+    # 2. Cas de Test 
     test_cases = [
         "What is the difference between Classic NLP and AI-based NLP?", # Lecture 01
         "Explain the process of Tokenization.", # Lecture 02
@@ -59,7 +57,7 @@ def evaluate():
     # 5. Sauvegarde du rapport
     df = pd.DataFrame(results)
     
-    # Assurez-vous que le dossier existe
+   
     os.makedirs(os.path.dirname(REPORT_PATH), exist_ok=True)
     
     df.to_csv(REPORT_PATH, index=False)
@@ -72,5 +70,6 @@ def evaluate():
 
 
 if __name__ == "__main__":
-    # Assurez-vous que le FAISS index a été créé localement avant de lancer ce script
+
     evaluate()
+
