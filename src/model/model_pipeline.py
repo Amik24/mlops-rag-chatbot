@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 
 # --- IMPORTS LANGCHAIN ---
 from langchain_groq import ChatGroq
-# ✅ On utilise 'community' pour la stabilité CPU (évite erreur Meta Tensor)
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import ChatPromptTemplate
@@ -40,7 +39,7 @@ class RAGModel:
         os.makedirs(LOCAL_INDEX_PATH)
 
         try:
-            # ✅ CONFIGURATION SANS CLÉ (ANONYME)
+            # CONFIGURATION SANS CLÉ (ANONYME)
             # On utilise signature_version=botocore.UNSIGNED pour dire "Pas besoin de clés"
             # Cela nécessite que le bucket S3 soit configuré en accès PUBLIC.
             s3 = boto3.client(
@@ -68,7 +67,7 @@ class RAGModel:
 
         print("🧠 Chargement des Embeddings (Version Community Stable)...")
         
-        # ✅ CORRECTION CPU : On force le device sur 'cpu'
+        # On force le device sur 'cpu'
         embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2",
             model_kwargs={'device': 'cpu'}
@@ -84,7 +83,7 @@ class RAGModel:
         except Exception as e:
             raise Exception(f"Erreur lors du chargement de FAISS (fichiers corrompus ?): {e}")
 
-        # 3. LLM (Groq) - La seule clé qui reste nécessaire
+        # 3. LLM (Groq)
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             raise ValueError("GROQ_API_KEY est manquante ! Vérifiez les variables d'environnement App Runner.")
@@ -126,3 +125,4 @@ class RAGModel:
             sources = [doc.metadata.get('source', 'Doc inconnu') for doc in response['context']]
             
         return response['answer'], sources
+
