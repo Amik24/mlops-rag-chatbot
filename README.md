@@ -5,17 +5,33 @@ L'objectif est de fournir des réponses précises basées sur un corpus document
 
 ---
 
+## 📑 Sommaire
+
+- [🔗 Liens Rapides](#-liens-rapides)
+- [🏗️ Architecture Technique & Flux de Données](#-architecture-technique--flux-de-données)
+- [📋 Informations Infrastructure AWS](#-informations-infrastructure-aws)
+- [🔐 Gestion de la Sécurité & Contraintes Étudiantes](#-gestion-de-la-sécurité--contraintes-étudiantes)
+- [✅ Feuille de Route et Avancement](#-feuille-de-route-et-avancement)
+- [📦 Structure du Projet](#-structure-du-projet)
+- [🚀 Guide de Déploiement (Mémo EC2)](#-guide-de-déploiement-mémo-ec2)
+- [🔧 Stack Technique](#-stack-technique)
+- [📊 Métriques et Monitoring](#-métriques-et-monitoring)
+- [🔄 Workflow CI/CD](#-workflow-cicd)
+- [👥 Équipe](#-équipe)
+
+---
+
 ## 🔗 Liens Rapides
 
 | Environnement | Statut | Lien |
 | :--- | :---: | :--- |
-| **Production (AWS EC2)** | 🟢 Stable | [Accéder au Chatbot (IP Publique)](http://15.188.63.159:8501/)) |
+| **Production (AWS EC2)** | 🟢 Stable | [Accéder au Chatbot (IP Publique)](http://15.188.63.159:8501/) |
 | **Test (Streamlit Cloud)** | 🟡 Dev | [Accéder à l'env de Test](https://mlops-rag-chatbot.streamlit.app/) |
 | **Code Source** | 📦 Git | [Repository GitHub](https://github.com/Amik24/mlops-rag-chatbot) |
 
 ---
 
-## Architecture Technique & Flux de Données
+## 🏗️ Architecture Technique & Flux de Données
 
 Le schéma ci-dessous illustre le pipeline CI/CD automatisé et l'interaction entre les services AWS en production sur EC2.
 
@@ -49,7 +65,7 @@ flowchart TD
 
 ---
 
-## Informations Infrastructure AWS
+## 📋 Informations Infrastructure AWS
 
 Configuration des ressources déployées dans la région `eu-west-3` (Paris).
 
@@ -66,7 +82,7 @@ Configuration des ressources déployées dans la région `eu-west-3` (Paris).
 
 ---
 
-## Gestion de la Sécurité & Contraintes Étudiantes
+## 🔐 Gestion de la Sécurité & Contraintes Étudiantes
 
 ### Problématique
 
@@ -82,7 +98,7 @@ L'environnement *AWS Learner Lab* impose des sessions de courte durée (4 heures
 
 ---
 
-## Feuille de Route et Avancement
+## ✅ Feuille de Route et Avancement
 
 ### I. INFRASTRUCTURE AWS
 
@@ -111,29 +127,30 @@ L'environnement *AWS Learner Lab* impose des sessions de courte durée (4 heures
 
 ---
 
-## Structure du Projet
+## 📦 Structure du Projet
 
 ```
 mlops-rag-chatbot/
 ├── .github/
-│   └── workflows/          # Pipelines CI/CD
+│   └── workflows/              # Pipelines CI/CD
 │       ├── test-aws.yml
+│       ├── data-vectorization.yml
 │       └── deploy-ecr.yml
 ├── src/
-│   ├── data/               # Scripts de préparation des données
+│   ├── data/                   # Scripts de préparation des données
 │   │   ├── download_data.py
 │   │   ├── build_embeddings.py
 │   │   └── data_pipeline.py
-│   └── app/                # Code de l'application Chatbot
+│   └── app/                    # Code de l'application Chatbot
 │       └── streamlit_app.py
-├── Dockerfile              # Configuration de l'image de production
-├── requirements.txt        # Dépendances Python
+├── Dockerfile                  # Configuration de l'image de production
+├── requirements.txt            # Dépendances Python
 └── README.md
 ```
 
 ---
 
-## Guide de Déploiement (Mémo EC2)
+## 🚀 Guide de Déploiement (Mémo EC2)
 
 Commandes utilisées pour déployer sur l'instance EC2 :
 
@@ -150,7 +167,7 @@ aws ecr get-login-password --region eu-west-3 | \
 # 3. Lancement du Conteneur
 sudo docker run -d \
   -p 8501:8501 \
-  -e GROQ_API_KEY='votre_cle_api' \
+  -e GROQ_API_KEY='notre_cle_api' \
   --entrypoint streamlit \
   073184925698.dkr.ecr.eu-west-3.amazonaws.com/g1-mlops:latest \
   run /app/app/streamlit_app.py
@@ -174,7 +191,7 @@ sudo docker pull 073184925698.dkr.ecr.eu-west-3.amazonaws.com/g1-mlops:latest
 
 ---
 
-## Stack Technique
+## 🔧 Stack Technique
 
 - **Cloud:** AWS (EC2, ECR, S3, IAM)
 - **DevOps:** GitHub Actions, Docker
@@ -183,48 +200,7 @@ sudo docker pull 073184925698.dkr.ecr.eu-west-3.amazonaws.com/g1-mlops:latest
 
 ---
 
-## Installation & Déploiement Local
-
-### Prérequis
-
-- Python 3.10+
-- Docker (optionnel)
-- Compte AWS avec accès S3 et ECR
-- Clé API Groq
-
-### Installation
-
-```bash
-# Cloner le repository
-git clone https://github.com/Amik24/mlops-rag-chatbot.git
-cd mlops-rag-chatbot
-
-# Installer les dépendances
-pip install -r requirements.txt
-
-# Configurer les variables d'environnement
-export GROQ_API_KEY="votre_clé_api"
-```
-
-### Lancer l'application localement
-
-```bash
-streamlit run src/app/streamlit_app.py
-```
-
-### Build Docker local
-
-```bash
-# Build de l'image
-docker build -t mlops-rag-chatbot .
-
-# Lancer le conteneur
-docker run -p 8501:8501 -e GROQ_API_KEY='votre_cle_api' mlops-rag-chatbot
-```
-
----
-
-## Métriques et Monitoring
+## 📊 Métriques et Monitoring
 
 - **Uptime:** Disponibilité 24/7 grâce à l'infrastructure EC2
 - **Performance:** Instance t3.medium optimisée pour les workloads ML
@@ -233,7 +209,7 @@ docker run -p 8501:8501 -e GROQ_API_KEY='votre_cle_api' mlops-rag-chatbot
 
 ---
 
-## Workflow CI/CD
+## 🔄 Workflow CI/CD
 
 Le pipeline automatisé se déclenche à chaque push sur `main` :
 
@@ -244,7 +220,6 @@ Le pipeline automatisé se déclenche à chaque push sur `main` :
 
 ---
 
-## Équipe
+## 👥 Équipe
 
-**Groupe :** G1-MG03  
----
+**Groupe :** G1-MG03
