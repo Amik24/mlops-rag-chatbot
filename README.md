@@ -122,7 +122,7 @@ L'environnement *AWS Learner Lab* impose des sessions de courte durée (4 heures
 | Tâche | Statut | Notes |
 | --- | --- | --- |
 | **3.1 ETL Pipeline** | ✅ Fait | Scripts de chunking et embedding (FAISS). |
-| **3.2 Interface RAG** | ✅ Fait | Chatbot fonctionnel avec historique de conversation. |
+| **3.2 Interface RAG** | ✅ Fait | Chatbot fonctionnel. |
 | **3.3 Déploiement** | ✅ Fait | Application accessible via IP Publique. |
 
 ---
